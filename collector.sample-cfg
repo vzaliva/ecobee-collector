@@ -1,0 +1,6 @@
+{
+"client-id":"FILL HERE",
+"refresh-token":"FILL HERE",
+"interval" : 600,
+"attempts" : 1
+}
