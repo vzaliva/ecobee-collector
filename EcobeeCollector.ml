@@ -74,6 +74,9 @@ let _ =
   let refresh_token = c |> member "refresh-token" |> to_string in
   let interval = c |> member "interval" |> to_int in
   let attempts = c |> member "attempts" |> to_int in
+  (* following two values are optional *)
+  let access_token = c |> member "access-token" |> to_option to_string in
+  let access_token_expiration = c |> member "access-token-expiration" |> to_option to_int in
   
   let rec mainloop () =
     let rec try_fetch a =
