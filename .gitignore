@@ -22,3 +22,14 @@ setup.log
 # local config
 collector.cfg
 
+.omakedb
+.omakedb.lock
+*.omc
+*.log
+*.cmx
+*.o
+*.opt
+*.run
+EcobeeCollector
+
+

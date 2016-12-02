@@ -1,0 +1,22 @@
+# Use the byte-code compiler
+BYTE_ENABLED = false
+NATIVE_ENABLED = true
+OCAMLCFLAGS += -g
+
+USE_OCAMLFIND = true
+OCAMLFINDFLAGS = -syntax camlp4o
+OCAMLPACKS[] = getopt yojson bolt netclient
+
+PROGRAM = EcobeeCollector
+FILES = $(PROGRAM) getoptext
+
+#Build the program
+OCamlProgram($(PROGRAM), $(FILES))
+.DEFAULT: $(PROGRAM)
+
+.PHONY: clean
+clean:
+  rm -f \
+     $(filter-proper-targets $(glob $(addsuffix .*, $(FILES)))) \
+     $(PROGRAM).run $(PROGRAM).opt $(PROGRAM) \
+	*.omc *.cmo *.o
