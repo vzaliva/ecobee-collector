@@ -107,6 +107,6 @@ let _ =
     >>= fun (t,_) -> t
     >>= fun z ->
                      LOG "Got %s" z LEVEL DEBUG;
-    Unix.sleep interval;
-    mainloop ()
+                     Unix.sleep interval;
+                     mainloop ()
   in mainloop ()
