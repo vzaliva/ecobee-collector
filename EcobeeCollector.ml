@@ -2,6 +2,7 @@ open Getopt
 open Getoptext
 open Yojson.Basic.Util
 open Core.Std
+open Option.Monad_infix
 
 let prograname = "EcobeeCollector" (* must match executable module name *)
 and version = "0.1"
@@ -58,25 +59,27 @@ let setup_log () =
     (Bolt.Mode.direct ())    
     "file" (!logfile, ({Bolt.Output.seconds_elapsed=Some seconds24h; Bolt.Output.signal_caught=None}))
 
-let renew_token client_id refresh_token : string option = None
-
-let fetch_data client_id refresh_token token : (string option * string) =
-  (fun c -> if (String.length token) = 0 then
-              match renew_token client_id refresh_token with
-              | Some nt -> c nt
-              | None -> (None, "")
-            else c token
-  )
-    (fun t ->
-      (None, t)
-    )
-
 let parse_cmdline () =
   let ue _ = print_usage specs; exit 1 in
   (try ext_parse_cmdline specs ue print_usage_and_exit_action with
    | Getopt.Error s -> Printf.printf "Error:\n    %s\n" s; ue ());
   if !cfgfile = "" then cfgfile := default_cfgfile;
   if !logfile = "" then logfile := default_logfile
+
+
+let renew_token client_id refresh_token : string option = None
+
+(**
+ * May return
+ * None: token fetch failed.
+ * Some (None, token_str): fetch failed, token availabe
+ * Some (Some data_str, token_str: fetch success, token available
+ **)
+let fetch_data client_id refresh_token token: (string option * string) option =
+  (match token with
+   | Some t -> Some t
+   | None -> renew_token client_id refresh_token)
+  >>= fun t -> Some (None,t)
 
 let _ =
   parse_cmdline ();
@@ -91,18 +94,19 @@ let _ =
   
   let rec mainloop () =
     let rec try_fetch a t =
-      let (data, nt) = fetch_data client_id refresh_token t in
-      match data with
-      | Some z ->  LOG "Fetch OK" LEVEL DEBUG; (Some z,"")
-      | None ->
-         LOG "Fetch attempt %d failed" (attempts-a+2) LEVEL DEBUG;
-         if a=0 then (None,nt) else try_fetch (a-1) nt
+      match fetch_data client_id refresh_token t with
+      | None as r ->
+         LOG "Key fetch attempt %d failed" (attempts-a+2) LEVEL DEBUG;
+         if a=0 then r else try_fetch (a-1) t
+      | Some (None, nt) as r ->
+         LOG "Data fetch attempt %d failed" (attempts-a+2) LEVEL DEBUG;
+         if a=0 then r else try_fetch (a-1) t
+      | Some (Some z, nt) ->  LOG "Fetch OK" LEVEL DEBUG; Some (Some z, nt)
     in
-    let (data, _) = try_fetch (attempts+1) "" in
-    (match data with
-     | Some z ->  LOG "Got %s" z LEVEL DEBUG (* TODO: process fetch results if Some *)
-     | None -> ()
-    );
+    try_fetch (attempts+1) None
+    >>= fun (t,_) -> t
+    >>= fun z ->
+                     LOG "Got %s" z LEVEL DEBUG;
     Unix.sleep interval;
     mainloop ()
   in mainloop ()
