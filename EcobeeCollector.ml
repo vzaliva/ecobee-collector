@@ -103,10 +103,11 @@ let _ =
          if a=0 then r else try_fetch (a-1) t
       | Some (Some z, nt) ->  LOG "Fetch OK" LEVEL DEBUG; Some (Some z, nt)
     in
-    try_fetch (attempts+1) None
-    >>= fun (t,_) -> t
-    >>= fun z ->
-                     LOG "Got %s" z LEVEL DEBUG;
-                     Unix.sleep interval;
-                     mainloop ()
+    ignore (try_fetch (attempts+1) None
+            >>= fun (t,_) -> t
+            >>= fun z ->
+                             LOG "Got %s" z LEVEL DEBUG ;
+                             None);
+    Unix.sleep interval;
+    mainloop ()
   in mainloop ()
