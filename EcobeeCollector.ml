@@ -1,6 +1,7 @@
 open Getopt
 open Getoptext
 open Yojson.Basic.Util
+open Core.Std
 
 let prograname = "EcobeeCollector" (* must match executable module name *)
 and version = "0.1"

@@ -5,7 +5,9 @@ OCAMLCFLAGS += -g
 
 USE_OCAMLFIND = true
 OCAMLFINDFLAGS = -syntax camlp4o
-OCAMLPACKS[] = getopt yojson bolt netclient
+OCAMLPACKS[] = getopt yojson bolt netclient core
+
+OCAMLOPTFLAGS += -thread
 
 PROGRAM = EcobeeCollector
 FILES = $(PROGRAM) getoptext
