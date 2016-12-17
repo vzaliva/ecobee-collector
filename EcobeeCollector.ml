@@ -57,6 +57,8 @@ let setup_log () =
     (Bolt.Mode.direct ())    
     "file" (!logfile, ({Bolt.Output.seconds_elapsed=Some seconds24h; Bolt.Output.signal_caught=None}))
 
+let fetch_data client_id refresh_token token : (string option * string) = (None, "")
+
 let parse_cmdline () =
   let ue _ = print_usage specs; exit 1 in
   (try ext_parse_cmdline specs ue print_usage_and_exit_action with
@@ -68,27 +70,27 @@ let _ =
   parse_cmdline ();
   setup_log ();
   LOG "Launched" LEVEL INFO;
-
+  
   let c = read_cfg () in
-  let cliend_id = c |> member "client-id" |> to_string in
+  let client_id = c |> member "client-id" |> to_string in
   let refresh_token = c |> member "refresh-token" |> to_string in
   let interval = c |> member "interval" |> to_int in
   let attempts = c |> member "attempts" |> to_int in
-  (* following two values are optional *)
-  let access_token = c |> member "access-token" |> to_option to_string in
-  let access_token_expiration = c |> member "access-token-expiration" |> to_option to_int in
   
   let rec mainloop () =
-    let rec try_fetch a =
-      let rc = 0 in (* TODO: fetch here *)
-      if rc=0 then
-        (LOG "Fetch OK" LEVEL DEBUG; rc)
-      else
-        (LOG "Fetch attempt %d failed with code %d" (attempts-a+2) rc LEVEL DEBUG;
-         if a=0 then rc else try_fetch (a-1))
+    let rec try_fetch a t =
+      let (data, nt) = fetch_data client_id refresh_token t in
+      match data with
+      | Some z ->  LOG "Fetch OK" LEVEL DEBUG; (Some z,"")
+      | None ->
+         LOG "Fetch attempt %d failed" (attempts-a+2) LEVEL DEBUG;
+         if a=0 then (None,nt) else try_fetch (a-1) nt
     in
-    let rc = try_fetch (attempts+1) in
-    (* TODO: process fetch results if rc=0 *)
+    let (data, _) = try_fetch (attempts+1) "" in
+    (match data with
+     | Some z ->  LOG "Got %s" z LEVEL DEBUG (* TODO: process fetch results if Some *)
+     | None -> ()
+    );
     Unix.sleep interval;
     mainloop ()
   in mainloop ()
