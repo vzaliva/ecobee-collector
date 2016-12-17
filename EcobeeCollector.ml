@@ -57,7 +57,18 @@ let setup_log () =
     (Bolt.Mode.direct ())    
     "file" (!logfile, ({Bolt.Output.seconds_elapsed=Some seconds24h; Bolt.Output.signal_caught=None}))
 
-let fetch_data client_id refresh_token token : (string option * string) = (None, "")
+let renew_token client_id refresh_token : string option = None
+
+let fetch_data client_id refresh_token token : (string option * string) =
+  (fun c -> if (String.length token) = 0 then
+              match renew_token client_id refresh_token with
+              | Some nt -> c nt
+              | None -> (None, "")
+            else c token
+  )
+    (fun t ->
+      (None, t)
+    )
 
 let parse_cmdline () =
   let ue _ = print_usage specs; exit 1 in
