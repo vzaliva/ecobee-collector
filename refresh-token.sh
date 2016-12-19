@@ -5,6 +5,6 @@
 
 CLID="fJOE8mFJLpUMmNdBoebNd1oD17opxZD3"
 
-curl -X POST "https://api.ecobee.com/token?grant_type=refresh_token&refresh_token=$1&client_id=$CLID"
+curl -v -X POST "https://api.ecobee.com/token?grant_type=refresh_token&refresh_token=$1&client_id=$CLID"
 
                 

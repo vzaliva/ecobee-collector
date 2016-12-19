@@ -5,7 +5,7 @@ OCAMLCFLAGS += -g
 
 USE_OCAMLFIND = true
 OCAMLFINDFLAGS = -syntax camlp4o
-OCAMLPACKS[] = getopt yojson bolt netclient core
+OCAMLPACKS[] = getopt yojson bolt netclient core curl
 
 OCAMLOPTFLAGS += -thread
 

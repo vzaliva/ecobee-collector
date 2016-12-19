@@ -6,12 +6,16 @@ open Option.Monad_infix
 
 let prograname = "EcobeeCollector" (* must match executable module name *)
 and version = "0.1"
+
 and default_cfgfile  = "collector.cfg"
 and default_logfile  = "collector.log"
+
+and api_endpoint = "https://api.ecobee.com/"
                          
 and debug = ref false
 and cfgfile  = ref ""
 and logfile  = ref ""
+
 
 let specs = 
   [
@@ -66,8 +70,41 @@ let parse_cmdline () =
   if !cfgfile = "" then cfgfile := default_cfgfile;
   if !logfile = "" then logfile := default_logfile
 
+let writer_callback a d =
+  Buffer.add_string a d;
+  String.length d
 
-let renew_token client_id refresh_token : string option = None
+let init_conn url =
+  let r = Buffer.create 16384
+  and c = Curl.init () in
+  Curl.set_timeout c 1200;
+  Curl.set_sslverifypeer c false;
+  Curl.set_sslverifyhost c Curl.SSLVERIFYHOST_EXISTENCE;
+  Curl.set_writefunction c (writer_callback r);
+  Curl.set_tcpnodelay c true;
+  Curl.set_verbose c false;
+  Curl.set_post c false;
+  Curl.set_url c url; r,c
+
+let do_post url data =
+  let r,c = init_conn url in
+  Curl.set_post c true;
+  Curl.set_postfields c data;
+  Curl.set_postfieldsize c (String.length data);
+  Curl.perform c;
+  let rc = Curl.get_responsecode c in
+  Curl.cleanup c;
+  rc, (Buffer.contents r)
+
+let renew_token client_id refresh_token : string option =
+  let params = Printf.sprintf  "grant_type=refresh_token&refresh_token=%s&client_id=%s"
+                               client_id refresh_token in
+  let r,c = do_post (api_endpoint ^ "token") params in
+  if r = 200 then
+    Some c
+         (* TODO: parse JSON response *)
+  else
+    None
 
 (**
  * May return
@@ -79,11 +116,14 @@ let fetch_data client_id refresh_token token: (string option * string) option =
   (match token with
    | Some t -> Some t
    | None -> renew_token client_id refresh_token)
-  >>= fun t -> Some (None,t)
+  >>= fun t ->
+  Some (None,t)
 
 let _ =
   parse_cmdline ();
   setup_log ();
+  Curl.global_init Curl.CURLINIT_GLOBALALL;
+
   LOG "Launched" LEVEL INFO;
   
   let c = read_cfg () in
