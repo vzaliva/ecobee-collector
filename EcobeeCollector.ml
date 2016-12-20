@@ -98,13 +98,15 @@ let do_post url data =
 
 let renew_token client_id refresh_token : string option =
   let params = Printf.sprintf  "grant_type=refresh_token&refresh_token=%s&client_id=%s"
-                               client_id refresh_token in
+                               refresh_token client_id  in
   let r,c = do_post (api_endpoint ^ "token") params in
   if r = 200 then
-    Some c
-         (* TODO: parse JSON response *)
+    let j = Yojson.Basic.from_string c in
+    LOG "Access token refreshed" LEVEL DEBUG;
+    Some (j |> member "access_token" |> to_string)
   else
-    None
+    (LOG "refresh token failed rsp=%s" c LEVEL ERROR;
+     None)
 
 (**
  * May return
