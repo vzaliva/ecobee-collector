@@ -103,7 +103,7 @@ let renew_token client_id refresh_token : string option =
   if r = 200 then
     let j = Yojson.Basic.from_string c in
     LOG "Access token refreshed" LEVEL DEBUG;
-    Some (j |> member "access_token" |> to_string)
+    (j |> member "access_token" |> to_option to_string)
   else
     (LOG "refresh token failed rsp=%s" c LEVEL ERROR;
      None)
