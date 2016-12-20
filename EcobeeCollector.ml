@@ -11,13 +11,13 @@ and default_cfgfile  = "collector.cfg"
 and default_logfile  = "collector.log"
 
 and api_endpoint = "https://api.ecobee.com/"
-                         
+
 and debug = ref false
 and cfgfile  = ref ""
 and logfile  = ref ""
 
 
-let specs = 
+let specs =
   [
     ( 'v', "version", Some (fun _ -> Printf.printf "%s %s\n" prograname version ; exit 0), None,
       "Show program version");
@@ -48,7 +48,7 @@ let read_cfg () =
   | _, None, _ , _ -> LOG "Missing 'refresh-token' config value" LEVEL ERROR; exit 1
   | _, _, None, _ -> LOG "Missing 'interval' config value" LEVEL ERROR; exit 1
   | _, _, _, None -> LOG "Missing 'attempts' config value" LEVEL ERROR; exit 1
-                                                                           
+
 
 let setup_log () =
   let seconds24h = 86400. in
@@ -60,7 +60,7 @@ let setup_log () =
     (if !debug then Bolt.Level.TRACE else Bolt.Level.INFO)
     "all"
     "datetime"
-    (Bolt.Mode.direct ())    
+    (Bolt.Mode.direct ())
     "file" (!logfile, ({Bolt.Output.seconds_elapsed=Some seconds24h; Bolt.Output.signal_caught=None}))
 
 let parse_cmdline () =
@@ -86,7 +86,7 @@ let init_conn url =
   Curl.set_post c false;
   Curl.set_url c url; r,c
 
-let do_post url data =
+let api_post url data =
   let r,c = init_conn url in
   Curl.set_post c true;
   Curl.set_postfields c data;
@@ -96,10 +96,22 @@ let do_post url data =
   Curl.cleanup c;
   rc, (Buffer.contents r)
 
+let api_get path version params acces_token =
+  let fullurl = Printf.sprintf "%s/%d/%s?%s" api_endpoint version path params in
+  let r,c = init_conn fullurl in
+  Curl.set_followlocation c true;
+  Curl.set_httpheader c [ "Content-Type: text/josn" ;
+                          "Authorization: Bearer " ^ acces_token
+                        ];
+  Curl.perform c;
+  let rc = Curl.get_responsecode c in
+  Curl.cleanup c;
+  rc, (Buffer.contents r)
+
 let renew_token client_id refresh_token : string option =
   let params = Printf.sprintf  "grant_type=refresh_token&refresh_token=%s&client_id=%s"
                                refresh_token client_id  in
-  let r,c = do_post (api_endpoint ^ "token") params in
+  let r,c = api_post (api_endpoint ^ "token") params in
   if r = 200 then
     let j = Yojson.Basic.from_string c in
     LOG "Access token refreshed" LEVEL DEBUG;
@@ -107,6 +119,10 @@ let renew_token client_id refresh_token : string option =
   else
     (LOG "refresh token failed rsp=%s" c LEVEL ERROR;
      None)
+
+let build_query params =
+  String.concat ~sep:"&"
+                (List.map params (fun (k,v) -> Curl.escape(k) ^ "=" ^ Curl.escape(v)))
 
 (**
  * May return
@@ -119,21 +135,32 @@ let fetch_data client_id refresh_token token: (string option * string) option =
    | Some t -> Some t
    | None -> renew_token client_id refresh_token)
   >>= fun t ->
-  Some (None,t)
-
+  let params = [
+      ("format","json") ;
+      ("body", "{\"selection\":{\"selectionType\":\"registered\",\"selectionMatch\":\"\",\"includeRuntime\":true}}")
+    ] in
+  let q = build_query params in
+  LOG "Query %s" q LEVEL DEBUG;
+  let r,c = api_get "thermostat" 1 q t in
+  if r = 200 then
+    (LOG "Got data %s" c LEVEL DEBUG;
+     Some (Some c, t))
+  else
+    Some (None,t)
+         
 let _ =
   parse_cmdline ();
   setup_log ();
   Curl.global_init Curl.CURLINIT_GLOBALALL;
 
   LOG "Launched" LEVEL INFO;
-  
+
   let c = read_cfg () in
   let client_id = c |> member "client-id" |> to_string in
   let refresh_token = c |> member "refresh-token" |> to_string in
   let interval = c |> member "interval" |> to_int in
   let attempts = c |> member "attempts" |> to_int in
-  
+
   let rec mainloop () =
     let rec try_fetch a t =
       match fetch_data client_id refresh_token t with
